@@ -148,7 +148,7 @@ localparam CONF_STR = {
   "OF,Allow Continue,Yes,No;",
   "-;",
   "R0,Reset;",
-  "J1,Fire,Jump,Start 1P,Start 2P,Coin;",
+  "J1,Jump,Fire,Start 1P,Start 2P,Coin;",
   "V,v",`BUILD_DATE
 };
 
@@ -402,13 +402,16 @@ T80s T80s_inst
 (*keep*) wire snd_opl_cs = !snd_z80_mreq_n && (snd_z80_addr>=16'h8000 && snd_z80_addr<=16'hbfff);
 
 // The sound latch (chip "2J" on schematic PDF page 9) can be read within this whole address range...
-(*keep*) wire snd_lat_cs			= !snd_z80_mreq_n && (snd_z80_addr>=16'hC000 && snd_z80_addr<=16'hFFFF);
+//(*keep*) wire snd_lat_cs			= !snd_z80_mreq_n && (snd_z80_addr>=16'hC000 && snd_z80_addr<=16'hFFFF);
+(*keep*) wire snd_lat_cs			= !snd_z80_mreq_n && (snd_z80_addr>=16'hC000 && snd_z80_addr<=16'hC001);	// TESTING !!
 
 // These addresses are only used during WRITES...
 (*keep*) wire snd_adpcm_start_cs	= !snd_z80_mreq_n && (snd_z80_addr>=16'hC000 && snd_z80_addr<=16'hCFFF);
 (*keep*) wire snd_adpcm_end_cs	= !snd_z80_mreq_n && (snd_z80_addr>=16'hD000 && snd_z80_addr<=16'hDFFF);
 (*keep*) wire snd_volume_cs 		= !snd_z80_mreq_n && (snd_z80_addr>=16'hE000 && snd_z80_addr<=16'hEFFF);
-(*keep*) wire snd_req_clear_cs	= !snd_z80_mreq_n && (snd_z80_addr>=16'hF000 && snd_z80_addr<=16'hFFFF);
+
+//(*keep*) wire snd_req_clear_cs	= !snd_z80_mreq_n && (snd_z80_addr>=16'hF000 && snd_z80_addr<=16'hFFFF);
+(*keep*) wire snd_req_clear_cs	= !snd_z80_mreq_n && (snd_z80_addr>=16'hF000 && snd_z80_addr<=16'hF001);	// TESTING !!
 
 
 assign snd_z80_di = (snd_rom_cs) ? snd_rom_do :
@@ -435,10 +438,12 @@ assign snd_z80_nmi_n = !req_flag;
 (*noprune*) reg [7:0] snd_latch;
 always @(posedge snd_clk or posedge core_reset)
 if (core_reset) begin
-	//req_flag <= 1'b0;			// The request flip flop gets CLEARED by a /RESET.
+	//req_flag <= 1'b0;		// The request flip flop gets CLEARED by a /RESET.
+	//snd_latch <= 8'h00;
 
 	req_flag <= 1'b1;			// TESTING !! Assert the request flag at reset.
-	snd_latch <= 8'h32;		// TESTING !! Play the Rygar intro music. ElectronAsh.
+	//snd_latch <= 8'h32;		// TESTING !! Play the Rygar intro music. ElectronAsh.
+	snd_latch <= 8'h34;		// TESTING !! Play the Rygar first level music. ElectronAsh.
 end
 else begin
 	// NOTE: The Rygar board doesn't appear to use this method of clearing the REQ / NMI flag.
@@ -460,11 +465,13 @@ else begin
 	// A write to the volume reg just latches the lower four data bits from the Z80, AFAIK...
 	if (snd_volume_cs && !snd_z80_wr_n) snd_volume_reg <= snd_z80_do[3:0];
 
-	
 	// A write to "REQ" flag address range will CLEAR the '74 flip flop at 6C.
 	// The Q output of that flip can be read by the MAIN Z80 via one of the input ports.
 	// The Q_N output is tied directly to the NMI_N input of the Sound Z80...
-	if (snd_req_clear_cs && !snd_z80_wr_n) req_flag <= 1'b0;
+	if (snd_req_clear_cs && !snd_z80_wr_n) begin
+		req_flag <= 1'b0;
+		snd_latch <= 8'h00;	// TESTING !!
+	end
 end
 
 
@@ -495,7 +502,7 @@ wire opl_irq_n;
 wire [1:0] opl_addr = {1'b0, snd_z80_addr[0]};	// Check!
 wire [7:0] opl_di = snd_z80_do;
 wire [7:0] opl_do;
-wire opl_we = snd_opl_cs && !snd_z80_mreq_n && !snd_z80_wr_n;
+wire opl_we = snd_opl_cs && !snd_z80_wr_n;
 
 wire [15:0] opl_samp_l;
 wire [15:0] opl_samp_r;
@@ -503,12 +510,14 @@ wire [15:0] opl_samp_r;
 opl3 opl3_inst
 (
 	.clk(snd_clk) ,				// input  clk
-	.clk_opl(snd_clk) ,			// input  clk_opl
+	
+	.clk_opl(clk_sys) ,			// input  clk_opl
+	
 	.rst_n(!core_reset) ,		// input  rst_n
 	
 	.irq_n( opl_irq_n ) ,		// output  irq_n
 	
-	.period_80us(2560) ,			// input [12:0] period_80us
+	.period_80us( 13'd2560 ) ,	// input [12:0] period_80us
 	
 	.addr(opl_addr) ,				// input [1:0] addr
 	.din(opl_di) ,					// input [7:0] din
