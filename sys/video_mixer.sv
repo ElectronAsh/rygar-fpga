@@ -70,9 +70,16 @@ wire [DWIDTH:0] G_sd;
 wire [DWIDTH:0] B_sd;
 wire hs_sd, vs_sd, hb_sd, vb_sd, ce_pix_sd;
 
+
+
 scandoubler #(.LENGTH(LINE_LENGTH), .HALF_DEPTH(HALF_DEPTH)) sd
 (
-	.*,
+	.clk_sys(clk_sys),
+	.ce_pix(ce_pix),
+	
+	.hq2x(hq2x),
+	.mono(mono),
+	
 	.hs_in(HSync),
 	.vs_in(VSync),
 	.hb_in(HBlank),
